@@ -1,4 +1,5 @@
 import AnthropicProvider from './providers/anthropic';
+import AzureOpenAIProvider from './providers/azure-openai';
 import CohereProvider from './providers/cohere';
 import DeepseekProvider from './providers/deepseek';
 import GoogleProvider from './providers/google';
@@ -19,6 +20,7 @@ import GithubProvider from './providers/github';
 
 export {
   AnthropicProvider,
+  AzureOpenAIProvider,
   CohereProvider,
   DeepseekProvider,
   GoogleProvider,
