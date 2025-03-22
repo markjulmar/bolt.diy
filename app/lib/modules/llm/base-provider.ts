@@ -13,6 +13,8 @@ export abstract class BaseProvider implements ProviderInfo {
     models: ModelInfo[];
   };
 
+  supportsManagedIdentity?: boolean | undefined;
+
   getApiKeyLink?: string;
   labelForGetApiKey?: string;
   icon?: string;

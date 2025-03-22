@@ -12,7 +12,7 @@ import { classNames } from '~/utils/classNames';
 import { PROVIDER_LIST } from '~/utils/constants';
 import { Messages } from './Messages.client';
 import { SendButton } from './SendButton.client';
-import { APIKeyManager, getApiKeysFromCookies } from './APIKeyManager';
+import { APIKeyManager, getApiKeysFromCookies, getManagedIdentityOptionsFromCookies } from './APIKeyManager';
 import Cookies from 'js-cookie';
 import * as Tooltip from '@radix-ui/react-tooltip';
 
@@ -31,6 +31,7 @@ import { toast } from 'react-toastify';
 import StarterTemplates from './StarterTemplates';
 import type { ActionAlert } from '~/types/actions';
 import ChatAlert from './ChatAlert';
+import type { ManagedIdentityOptions } from '~/lib/modules/llm/providers/azure-openai';
 import type { ModelInfo } from '~/lib/modules/llm/types';
 import ProgressCompilation from './ProgressCompilation';
 import type { ProgressAnnotation } from '~/types/context';
@@ -112,6 +113,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     const [apiKeys, setApiKeys] = useState<Record<string, string>>(getApiKeysFromCookies());
+    const [managedIdentityOptions, setManagedIdentityOptions] = useState<ManagedIdentityOptions>(
+      getManagedIdentityOptionsFromCookies(),
+    );
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);
     const [isListening, setIsListening] = useState(false);
@@ -199,6 +203,33 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       const newApiKeys = { ...apiKeys, [providerName]: apiKey };
       setApiKeys(newApiKeys);
       Cookies.set('apiKeys', JSON.stringify(newApiKeys));
+
+      setIsModelLoading(providerName);
+
+      let providerModels: ModelInfo[] = [];
+
+      try {
+        const response = await fetch(`/api/models/${encodeURIComponent(providerName)}`);
+        const data = await response.json();
+        providerModels = (data as { modelList: ModelInfo[] }).modelList;
+      } catch (error) {
+        console.error('Error loading dynamic models for:', providerName, error);
+      }
+
+      // Only update models for the specific provider
+      setModelList((prevModels) => {
+        const otherModels = prevModels.filter((model) => model.provider !== providerName);
+        return [...otherModels, ...providerModels];
+      });
+      setIsModelLoading(undefined);
+    };
+
+    const onManagedIdentityOptionsChange = async (
+      providerName: string,
+      managedIdentityOptions: ManagedIdentityOptions,
+    ) => {
+      setManagedIdentityOptions(managedIdentityOptions);
+      Cookies.set('managedIdentityOptions', JSON.stringify(managedIdentityOptions));
 
       setIsModelLoading(providerName);
 
@@ -421,6 +452,10 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                                 apiKey={apiKeys[provider.name] || ''}
                                 setApiKey={(key) => {
                                   onApiKeysChange(provider.name, key);
+                                }}
+                                managedIdentityOptions={managedIdentityOptions}
+                                setManagedIdentityOptions={(managedIdentityOptions) => {
+                                  onManagedIdentityOptionsChange(provider.name, managedIdentityOptions);
                                 }}
                               />
                             )}

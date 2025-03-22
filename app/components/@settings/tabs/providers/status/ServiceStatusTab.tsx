@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { classNames } from '~/utils/classNames';
-import { TbActivityHeartbeat } from 'react-icons/tb';
+import { TbActivityHeartbeat, TbBrandAzure } from 'react-icons/tb';
 import { BsCheckCircleFill, BsXCircleFill, BsExclamationCircleFill } from 'react-icons/bs';
 import { SiAmazon, SiGoogle, SiHuggingface, SiPerplexity, SiOpenai } from 'react-icons/si';
 import { BsRobot, BsCloud } from 'react-icons/bs';
@@ -16,6 +16,7 @@ import { useToast } from '~/components/ui/use-toast';
 type ProviderName =
   | 'AmazonBedrock'
   | 'Anthropic'
+  | 'AzureOpenAI'
   | 'Cohere'
   | 'Deepseek'
   | 'Google'
@@ -72,6 +73,15 @@ const PROVIDER_STATUS_URLS: Record<ProviderName, ProviderConfig> = {
       Authorization: 'Bearer $OPENAI_API_KEY',
     },
     testModel: 'gpt-3.5-turbo',
+  },
+  AzureOpenAI: {
+    statusUrl: 'https://azure.microsoft.com/status/',
+    apiUrl:
+      'https://$AZURE_OPENAI_API_NAME/openai/deployments/gpt-4o-mini/chat/completions?api-version=2024-12-01-preview',
+    headers: {
+      Authorization: 'Bearer: $AZURE_OPENAI_API_KEY',
+    },
+    testModel: 'gpt-4o-mini',
   },
   Anthropic: {
     statusUrl: 'https://status.anthropic.com/',
@@ -175,6 +185,7 @@ const PROVIDER_STATUS_URLS: Record<ProviderName, ProviderConfig> = {
 const PROVIDER_ICONS: Record<ProviderName, IconType> = {
   AmazonBedrock: SiAmazon,
   Anthropic: FaBrain,
+  AzureOpenAI: TbBrandAzure,
   Cohere: BiChip,
   Google: SiGoogle,
   Groq: BsCloud,
@@ -208,6 +219,7 @@ const ServiceStatusTab = () => {
       // Map provider names to environment variable names
       const envKeyMap: Record<ProviderName, string> = {
         OpenAI: 'OPENAI_API_KEY',
+        AzureOpenAI: 'AZURE_OPENAI_API_KEY',
         Anthropic: 'ANTHROPIC_API_KEY',
         Cohere: 'COHERE_API_KEY',
         Google: 'GOOGLE_GENERATIVE_AI_API_KEY',
