@@ -60,6 +60,16 @@ function CurrentDateTime() {
   );
 }
 
+const useIsDebug = () => {
+  const [isDebug, setIsDebug] = useState(false);
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    setIsDebug(searchParams.get('debug') === 'true');
+  }, []);
+
+  return isDebug;
+};
+
 export const Menu = () => {
   const { duplicateCurrentChat, exportChat } = useChatHistory();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -68,6 +78,7 @@ export const Menu = () => {
   const [dialogContent, setDialogContent] = useState<DialogContent>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const profile = useStore(profileStore);
+  const isDebug = useIsDebug();
 
   const { filteredItems: filteredList, handleSearchChange } = useSearchFilter({
     items: list,
@@ -149,8 +160,10 @@ export const Menu = () => {
   };
 
   const handleSettingsClick = () => {
-    setIsSettingsOpen(true);
-    setOpen(false);
+    if (isDebug) {
+      setIsSettingsOpen(true);
+      setOpen(false);
+    }
   };
 
   const handleSettingsClose = () => {
@@ -175,9 +188,22 @@ export const Menu = () => {
         <div className="h-12 flex items-center justify-between px-4 border-b border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-900/50">
           <div className="text-gray-900 dark:text-white font-medium"></div>
           <div className="flex items-center gap-3">
-            <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
+            <button
+              onClick={() => {
+                if (confirm('Are you sure you want to log out?')) {
+                  profileStore.set({
+                    username: '',
+                    avatar: '',
+                    bio: '',
+                  });
+                  window.location.href = '/logout';
+                }
+              }}
+              className="font-medium text-sm text-gray-900 dark:text-white truncate hover:underline cursor-pointer"
+              aria-label="Log out"
+            >
               {profile?.username || 'Guest User'}
-            </span>
+            </button>
             <div className="flex items-center justify-center w-[32px] h-[32px] overflow-hidden bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-500 rounded-full shrink-0">
               {profile?.avatar ? (
                 <img
@@ -277,7 +303,7 @@ export const Menu = () => {
             </DialogRoot>
           </div>
           <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 px-4 py-3">
-            <SettingsButton onClick={handleSettingsClick} />
+            {isDebug ? <SettingsButton onClick={handleSettingsClick} /> : <div /> /* Empty div to maintain spacing */}
             <ThemeSwitch />
           </div>
         </div>

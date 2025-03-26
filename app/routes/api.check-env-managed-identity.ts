@@ -7,6 +7,8 @@ export const loader: LoaderFunction = async ({ context, request }) => {
 
   if (
     !provider ||
+    !providerManagedIdentityEnvKeys ||
+    !providerManagedIdentityEnvKeys[provider] ||
     !providerManagedIdentityEnvKeys[provider].clientIdKey ||
     !providerManagedIdentityEnvKeys[provider].tenantIdKey ||
     !providerManagedIdentityEnvKeys[provider].clientSecretKey

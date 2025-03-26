@@ -478,13 +478,22 @@ export const ChatImpl = memo(
     }, []);
 
     const handleModelChange = (newModel: string) => {
-      setModel(newModel);
-      Cookies.set('selectedModel', newModel, { expires: 30 });
+      if (newModel) {
+        setModel(newModel);
+        Cookies.set('selectedModel', newModel, { expires: 30 });
+      } else {
+        setModel('');
+        Cookies.remove('selectedModel');
+      }
     };
 
     const handleProviderChange = (newProvider: ProviderInfo) => {
-      setProvider(newProvider);
-      Cookies.set('selectedProvider', newProvider.name, { expires: 30 });
+      if (newProvider) {
+        setProvider(newProvider);
+        Cookies.set('selectedProvider', newProvider.name, { expires: 30 });
+      } else {
+        Cookies.remove('selectedProvider');
+      }
     };
 
     return (

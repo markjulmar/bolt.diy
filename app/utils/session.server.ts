@@ -3,13 +3,8 @@ import { SESSION_COOKIE_KEY } from '~/config/auth.server';
 
 const sessionSecret = process.env.SESSION_SECRET;
 
-if (!sessionSecret) {
-  throw new Error('SESSION_SECRET must be set');
-}
-
-// Validate session secret length and complexity
-if (sessionSecret.length < 32) {
-  throw new Error('SESSION_SECRET must be at least 32 characters long');
+if (!sessionSecret || sessionSecret.length < 32) {
+  throw new Error('SESSION_SECRET must be set and at least 32 characters long');
 }
 
 // Check if the secret contains at least 8 unique characters for security
@@ -53,11 +48,21 @@ export async function getSession(request: Request) {
   return session;
 }
 
-export async function createUserSession(request: Request, userId: string, redirectTo: string) {
+export async function createUserSession(
+  request: Request,
+  userId: string,
+  username: string,
+  avatar: string,
+  redirectTo: string,
+) {
   const session = await getSession(request);
 
-  console.log(`Creating session with userId: ${userId} and redirectTo: ${redirectTo}`);
+  console.log(
+    `Creating session with userId: ${userId}, username: ${username}, avatar: ${avatar}, and redirectTo: ${redirectTo}`,
+  );
   session.set('userId', userId);
+  session.set('username', username);
+  session.set('avatar', avatar);
 
   const cookie = await sessionStorage.commitSession(session);
   console.log('Session cookie details:', {
@@ -78,29 +83,47 @@ export async function createUserSession(request: Request, userId: string, redire
 
 export async function getUserFromSession(request: Request) {
   const session = await getSession(request);
+
   const userId = session.get('userId');
+  const username = session.get('username');
+  const avatar = session.get('avatar');
+
   console.log('Getting user from session:', {
     hasUserId: session.has('userId'),
     userId,
+    username,
+    avatar,
   });
 
-  if (!userId || typeof userId !== 'string') {
+  if (!userId || !username) {
     return null;
   }
 
-  return userId;
+  // Return the profile data instead of updating store directly
+  return {
+    userId,
+    profile: {
+      username,
+      bio: '', // Add bio if you store it in the session
+      avatar: avatar || '',
+    },
+  };
 }
 
 export async function requireUserId(request: Request, redirectTo: string = new URL(request.url).pathname) {
   const session = await getSession(request);
   const userId = session.get('userId');
-  console.log('Requiring user ID:', {
+  const username = session.get('username');
+  const avatar = session.get('avatar');
+
+  console.log('Checking for required userId', {
     hasUserId: session.has('userId'),
     userId,
-    type: typeof userId,
+    username,
+    avatar,
   });
 
-  if (!userId || typeof userId !== 'string') {
+  if (!userId || !username) {
     const searchParams = new URLSearchParams([['redirectTo', redirectTo]]);
     throw redirect(`/login?${searchParams}`);
   }
@@ -115,9 +138,15 @@ export async function logout(request: Request) {
     userId: session.get('userId'),
   });
 
-  return redirect('/', {
+  const cookie = await sessionStorage.destroySession(session);
+
+  const response = new Response(null, {
+    status: 302,
     headers: {
-      'Set-Cookie': await sessionStorage.destroySession(session),
+      Location: '/login',
+      'Set-Cookie': cookie,
     },
   });
+
+  return response;
 }

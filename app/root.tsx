@@ -9,6 +9,10 @@ import { useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { ClientOnly } from 'remix-utils/client-only';
+import { json, type LoaderFunctionArgs } from '@remix-run/cloudflare';
+import { useLoaderData } from '@remix-run/react';
+import { getUserFromSession } from '~/utils/session.server';
+import { initializeProfile, type Profile } from '~/lib/stores/profile';
 
 import reactToastifyStyles from 'react-toastify/dist/ReactToastify.css?url';
 import globalStyles from './styles/index.scss?url';
@@ -83,7 +87,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 import { logStore } from './lib/stores/logs';
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  const userData = await getUserFromSession(request);
+
+  console.log('Root loader received user data:', userData);
+
+  return json({
+    user: userData?.userId
+      ? {
+          id: userData.userId,
+          profile: userData.profile,
+        }
+      : null,
+  });
+}
+
 export default function App() {
+  const { user } = useLoaderData<typeof loader>();
   const theme = useStore(themeStore);
 
   useEffect(() => {
@@ -94,6 +114,13 @@ export default function App() {
       timestamp: new Date().toISOString(),
     });
   }, []);
+
+  // Initialize the profile store on app load with server data
+  useEffect(() => {
+    if (user?.profile) {
+      initializeProfile(user.profile as Profile);
+    }
+  }, [user]);
 
   return (
     <Layout>

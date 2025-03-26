@@ -88,7 +88,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     console.log('Redirecting to:', redirectTo);
 
-    return createUserSession(request, `${githubUser.login}:${githubUser.id}`, redirectTo);
+    return createUserSession(
+      request,
+      githubUser.id.toString(),
+      githubUser.login,
+      githubUser.avatar_url || '',
+      redirectTo,
+    );
   } catch (error) {
     console.error('GitHub auth error:', {
       error: error instanceof Error ? error.message : 'Unknown error',
