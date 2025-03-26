@@ -58,7 +58,10 @@ export default class AzureOpenAIProvider extends BaseProvider {
     });
 
     if (apiKey && resourceName) {
-      // Use the deployments API to get the models.
+      /*
+       * Use the deployments API to get the models. CognitiveServicesManagementClient can only be used
+       * with a managed identity.
+       */
       const response = await fetch(
         `https://${resourceName.trim()}.openai.azure.com/openai/deployments?api-version=2022-12-01`,
         {
