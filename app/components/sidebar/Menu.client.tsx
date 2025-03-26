@@ -188,22 +188,26 @@ export const Menu = () => {
         <div className="h-12 flex items-center justify-between px-4 border-b border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-900/50">
           <div className="text-gray-900 dark:text-white font-medium"></div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                if (confirm('Are you sure you want to log out?')) {
-                  profileStore.set({
-                    username: '',
-                    avatar: '',
-                    bio: '',
-                  });
-                  window.location.href = '/logout';
-                }
-              }}
-              className="font-medium text-sm text-gray-900 dark:text-white truncate hover:underline cursor-pointer"
-              aria-label="Log out"
-            >
-              {profile?.username || 'Guest User'}
-            </button>
+            {profile?.username ? (
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to log out?')) {
+                    profileStore.set({
+                      username: '',
+                      avatar: '',
+                      bio: '',
+                    });
+                    window.location.href = '/logout';
+                  }
+                }}
+                className="font-medium text-sm text-gray-900 dark:text-white truncate hover:underline cursor-pointer"
+                aria-label="Log out"
+              >
+                {profile.username}
+              </button>
+            ) : (
+              <span className="font-medium text-sm text-gray-900 dark:text-white truncate">Guest User</span>
+            )}
             <div className="flex items-center justify-center w-[32px] h-[32px] overflow-hidden bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-500 rounded-full shrink-0">
               {profile?.avatar ? (
                 <img

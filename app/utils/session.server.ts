@@ -1,42 +1,47 @@
 import { createCookieSessionStorage, redirect } from '@remix-run/cloudflare';
-import { SESSION_COOKIE_KEY } from '~/config/auth.server';
+import { SESSION_COOKIE_KEY, isAuthEnabled } from '~/config/auth.server';
 
-const sessionSecret = process.env.SESSION_SECRET;
+const sessionSecret = process.env.SESSION_SECRET || '';
 
-if (!sessionSecret || sessionSecret.length < 32) {
+if (isAuthEnabled && (!sessionSecret || sessionSecret.length < 32)) {
   throw new Error('SESSION_SECRET must be set and at least 32 characters long');
 }
 
-// Check if the secret contains at least 8 unique characters for security
-const uniqueChars = new Set(sessionSecret).size;
+const sessionStorage = isAuthEnabled
+  ? createCookieSessionStorage({
+      cookie: {
+        name: SESSION_COOKIE_KEY,
+        secure: process.env.NODE_ENV === 'production',
+        secrets: [sessionSecret],
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        httpOnly: true,
+      },
+    })
+  : null;
 
-if (uniqueChars < 8) {
-  throw new Error('SESSION_SECRET must contain at least 8 unique characters');
+function assertSessionStorage() {
+  if (!sessionStorage) {
+    throw new Error('Session storage is not available');
+  }
 }
 
-export const sessionStorage = createCookieSessionStorage({
-  cookie: {
-    name: SESSION_COOKIE_KEY,
-    secure: process.env.NODE_ENV === 'production',
-    secrets: [sessionSecret],
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 60 * 60 * 24 * 30, // 30 days
-    httpOnly: true,
-  },
-});
-
-const { getSession: getSessionFromStorage } = sessionStorage;
-
 export async function getSession(request: Request) {
+  if (!isAuthEnabled) {
+    return null;
+  }
+
   const cookie = request.headers.get('Cookie');
   console.log('Getting Request cookie:', {
-    present: cookie ? 'yes' : 'no',
+    present: !!cookie,
     length: cookie?.length || 0,
     value: cookie ? cookie.substring(0, 50) + '...' : 'none',
   });
 
-  const session = await getSessionFromStorage(cookie);
+  assertSessionStorage();
+
+  const session = await sessionStorage!.getSession(cookie);
   const sessionData = session.data;
   console.log('Session data:', {
     hasUserId: session.has('userId'),
@@ -57,32 +62,46 @@ export async function createUserSession(
 ) {
   const session = await getSession(request);
 
+  if (!session) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: redirectTo,
+      },
+    });
+  }
+
   console.log(
     `Creating session with userId: ${userId}, username: ${username}, avatar: ${avatar}, and redirectTo: ${redirectTo}`,
   );
+
   session.set('userId', userId);
   session.set('username', username);
   session.set('avatar', avatar);
 
-  const cookie = await sessionStorage.commitSession(session);
+  assertSessionStorage();
+
+  const cookie = await sessionStorage!.commitSession(session);
   console.log('Session cookie details:', {
     length: cookie.length,
-    value: cookie.substring(0, 50) + '...', // Log first 50 chars for debugging
+    value: cookie.substring(0, 50) + '...',
   });
 
-  const response = new Response(null, {
+  return new Response(null, {
     status: 302,
     headers: {
       Location: redirectTo,
       'Set-Cookie': cookie,
     },
   });
-
-  return response;
 }
 
 export async function getUserFromSession(request: Request) {
   const session = await getSession(request);
+
+  if (!session) {
+    return null;
+  }
 
   const userId = session.get('userId');
   const username = session.get('username');
@@ -99,33 +118,40 @@ export async function getUserFromSession(request: Request) {
     return null;
   }
 
-  // Return the profile data instead of updating store directly
   return {
     userId,
     profile: {
       username,
-      bio: '', // Add bio if you store it in the session
+      bio: '',
       avatar: avatar || '',
     },
   };
 }
 
 export async function requireUserId(request: Request, redirectTo: string = new URL(request.url).pathname) {
+  if (!isAuthEnabled) {
+    console.log('Auth is disabled, skipping userId check');
+    return null;
+  }
+
   const session = await getSession(request);
-  const userId = session.get('userId');
-  const username = session.get('username');
-  const avatar = session.get('avatar');
+
+  if (!session) {
+    return null;
+  }
+
+  const userId = session?.get('userId');
+  const username = session?.get('username');
 
   console.log('Checking for required userId', {
-    hasUserId: session.has('userId'),
+    hasUserId: session?.has('userId') || false,
     userId,
     username,
-    avatar,
   });
 
   if (!userId || !username) {
-    const searchParams = new URLSearchParams([['redirectTo', redirectTo]]);
-    throw redirect(`/login?${searchParams}`);
+    const searchParams = new URLSearchParams({ redirectTo });
+    throw redirect(`/login?${searchParams.toString()}`);
   }
 
   return userId;
@@ -133,20 +159,28 @@ export async function requireUserId(request: Request, redirectTo: string = new U
 
 export async function logout(request: Request) {
   const session = await getSession(request);
+
+  if (!session) {
+    return new Response(null, {
+      status: 302,
+      headers: { Location: '/' },
+    });
+  }
+
   console.log('Logging out user:', {
     hasUserId: session.has('userId'),
     userId: session.get('userId'),
   });
 
-  const cookie = await sessionStorage.destroySession(session);
+  assertSessionStorage();
 
-  const response = new Response(null, {
+  const cookie = await sessionStorage!.destroySession(session);
+
+  return new Response(null, {
     status: 302,
     headers: {
       Location: '/login',
       'Set-Cookie': cookie,
     },
   });
-
-  return response;
 }

@@ -1,9 +1,12 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  GITHUB_CLIENT_ID: z.string(),
-  GITHUB_CLIENT_SECRET: z.string(),
-  ALLOWED_GITHUB_USERS: z.string().transform((str) => str.split(',').map((s) => s.trim())),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  ALLOWED_GITHUB_USERS: z
+    .string()
+    .optional()
+    .transform((str) => str?.split(',').map((s) => s.trim()) || []),
 });
 
 const env = envSchema.parse({
@@ -17,14 +20,16 @@ export const GITHUB_API_URL = 'https://api.github.com';
 export const SESSION_COOKIE_KEY = 'github-session';
 
 export const config = {
-  clientId: env.GITHUB_CLIENT_ID,
-  clientSecret: env.GITHUB_CLIENT_SECRET,
-  allowedUsers: env.ALLOWED_GITHUB_USERS,
+  clientId: env.GITHUB_CLIENT_ID || '',
+  clientSecret: env.GITHUB_CLIENT_SECRET || '',
+  allowedUsers: env.ALLOWED_GITHUB_USERS || [],
   callbackUrl: `${process.env.APP_URL}/auth/github/callback`,
 } as const;
 
-export async function isUserAllowed(githubUsername: string): Promise<boolean> {
-  return config.allowedUsers.includes(githubUsername);
+export const isAuthEnabled = Boolean(config.clientId && config.clientSecret && config.allowedUsers.length > 0);
+
+export function isUserAllowed(githubUsername: string): boolean {
+  return !isAuthEnabled || config.allowedUsers.includes(githubUsername);
 }
 
 export async function getGithubUser(accessToken: string) {

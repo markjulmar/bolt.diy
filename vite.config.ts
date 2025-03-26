@@ -73,6 +73,9 @@ const gitInfo = getGitInfo();
 
 export default defineConfig((config) => {
   return {
+    server: {
+      allowedHosts: ['bolt-ctbbhyfph2cggccd.westus-01.azurewebsites.net'],
+    },
     define: {
       __COMMIT_HASH: JSON.stringify(gitInfo.commitHash),
       __GIT_BRANCH: JSON.stringify(gitInfo.branch),
@@ -89,7 +92,6 @@ export default defineConfig((config) => {
       __PKG_DEV_DEPENDENCIES: JSON.stringify(pkg.devDependencies),
       __PKG_PEER_DEPENDENCIES: JSON.stringify(pkg.peerDependencies),
       __PKG_OPTIONAL_DEPENDENCIES: JSON.stringify(pkg.optionalDependencies),
-      // Define global values
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
     },
     build: {
@@ -98,6 +100,7 @@ export default defineConfig((config) => {
         output: {
           format: 'esm',
         },
+        external: ['@azure/identity', '@azure/arm-cognitiveservices', '@azure/arm-resources'],
       },
       commonjsOptions: {
         transformMixedEsModules: true,
@@ -113,6 +116,9 @@ export default defineConfig((config) => {
     resolve: {
       alias: {
         buffer: 'vite-plugin-node-polyfills/polyfills/buffer',
+        '@azure/identity': '@azure/identity/dist/index.js',
+        '@azure/arm-cognitiveservices': '@azure/arm-cognitiveservices/dist/index.js',
+        '@azure/arm-resources': '@azure/arm-resources/dist/index.js',
       },
     },
     plugins: [
@@ -136,6 +142,8 @@ export default defineConfig((config) => {
               map: null,
             };
           }
+
+          return undefined;
         },
       },
       config.mode !== 'test' && remixCloudflareDevProxy(),

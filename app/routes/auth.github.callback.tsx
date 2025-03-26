@@ -75,7 +75,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     const githubUser = (await getGithubUser(tokenData.access_token)) as GitHubUser;
-    const isAllowed = await isUserAllowed(githubUser.login);
+    const isAllowed = isUserAllowed(githubUser.login);
 
     console.log(`GitHub user: ${githubUser.login}, isAllowed: ${isAllowed}`);
 
