@@ -234,28 +234,51 @@ export default class AzureOpenAIProvider extends BaseProvider {
 
     const { clientId, tenantId, clientSecret } = this._getAzureConfiguration(this._serverEnv);
 
-    if (!clientId || !tenantId || !clientSecret) {
+    if (!clientId || !tenantId) {
       throw new Error('Missing Azure credentials');
     }
 
-    const response = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
-        scope,
-      }),
-    });
+    let data: TokenResponse;
 
-    if (!response.ok) {
-      throw new Error('Failed to get access token');
+    if (clientSecret) {
+      const response = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: clientId,
+          client_secret: clientSecret,
+          scope,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get access token');
+      }
+
+      data = (await response.json()) as TokenResponse;
+    } else {
+      // Use Managed Identity via the MSI endpoint
+      const resource = scope.endsWith('.default') ? scope.slice(0, -8) : scope;
+      let msiUrl = `http://169.254.169.254/metadata/identity/oauth2/token?api-version=2019-08-01&resource=${encodeURIComponent(resource)}`;
+
+      if (clientId) {
+        msiUrl += `&client_id=${encodeURIComponent(clientId)}`;
+      }
+
+      const response = await fetch(msiUrl, {
+        method: 'GET',
+        headers: { Metadata: 'true' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get managed identity token: ${response.statusText}`);
+      }
+
+      data = await response.json();
     }
-
-    const data = (await response.json()) as TokenResponse;
 
     if (data.token_type !== 'Bearer') {
       throw new Error('Invalid token type returned from Azure.');
