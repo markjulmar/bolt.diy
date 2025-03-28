@@ -1,4 +1,6 @@
-import { cloudflareDevProxyVitePlugin as remixCloudflareDevProxy, vitePlugin as remixVitePlugin } from '@remix-run/dev';
+// Commented out for Azure Web Apps deployment
+// import { cloudflareDevProxyVitePlugin as remixCloudflareDevProxy, vitePlugin as remixVitePlugin } from '@remix-run/dev';
+import { vitePlugin as remixVitePlugin } from '@remix-run/dev';
 import UnoCSS from 'unocss/vite';
 import { defineConfig, type ViteDevServer } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
@@ -96,6 +98,7 @@ export default defineConfig((config) => {
     },
     build: {
       target: 'esnext',
+      outDir: "build/client", // Matches existing build structure and Remix configuration
       rollupOptions: {
         output: {
           format: 'esm',
@@ -126,7 +129,7 @@ export default defineConfig((config) => {
           global: true,
         },
         protocolImports: true,
-        // Exclude Node.js modules that shouldn't be polyfilled in Cloudflare
+        // Exclude Node.js modules that shouldn't be polyfilled in Azure Web Apps
         exclude: ['child_process', 'fs', 'path'],
       }),
       {
@@ -142,7 +145,8 @@ export default defineConfig((config) => {
           return undefined;
         },
       },
-      config.mode !== 'test' && remixCloudflareDevProxy(),
+      // Cloudflare specific - commented out for Azure Web Apps deployment
+      // config.mode !== 'test' && remixCloudflareDevProxy(),
       remixVitePlugin({
         future: {
           v3_fetcherPersist: true,
