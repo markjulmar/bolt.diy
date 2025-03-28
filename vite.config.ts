@@ -100,7 +100,6 @@ export default defineConfig((config) => {
         output: {
           format: 'esm',
         },
-        external: ['@azure/identity', '@azure/arm-cognitiveservices', '@azure/arm-resources'],
       },
       commonjsOptions: {
         transformMixedEsModules: true,
@@ -116,9 +115,6 @@ export default defineConfig((config) => {
     resolve: {
       alias: {
         buffer: 'vite-plugin-node-polyfills/polyfills/buffer',
-        '@azure/identity': '@azure/identity/dist/index.js',
-        '@azure/arm-cognitiveservices': '@azure/arm-cognitiveservices/dist/index.js',
-        '@azure/arm-resources': '@azure/arm-resources/dist/index.js',
       },
     },
     plugins: [

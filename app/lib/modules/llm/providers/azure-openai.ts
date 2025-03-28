@@ -4,9 +4,48 @@ import { BaseProvider } from '~/lib/modules/llm/base-provider';
 import type { ModelInfo } from '~/lib/modules/llm/types';
 import { LLMManager } from '~/lib/modules/llm/manager';
 import type { IProviderSetting } from '~/types/model';
-import { CognitiveServicesManagementClient, type Deployment } from '@azure/arm-cognitiveservices';
-import { ClientSecretCredential, type AccessToken } from '@azure/identity';
-import { createScopedLogger } from '~/utils/logger';
+
+interface TokenResponse {
+  access_token: string;
+  expires_in: number;
+  token_type: string;
+}
+
+interface AzureDeployment {
+  name: string;
+  properties?: {
+    model?: {
+      format?: string;
+      name?: string;
+      version?: string;
+    };
+    capabilities?: {
+      chatCompletion?: boolean;
+      maxOutputToken?: string;
+    };
+  };
+}
+
+interface OpenAIDeployment {
+  id: string;
+  model: string;
+  owner: string;
+  status: string;
+  created_at: number;
+  updated_at: number;
+  object: string;
+  scale_settings: {
+    scale_type: 'standard' | string;
+  };
+}
+
+type DeploymentType = AzureDeployment | OpenAIDeployment;
+
+interface TokenInfo {
+  token: string;
+  expiresAt: number;
+  scope: string;
+}
 
 export interface ManagedIdentityOptions {
   clientId: string;
@@ -14,11 +53,10 @@ export interface ManagedIdentityOptions {
   clientSecret: string;
 }
 
-const logger = createScopedLogger('AzureOpenAIProvider');
-
 export default class AzureOpenAIProvider extends BaseProvider {
-  private _accessToken: AccessToken | undefined;
-  private _scope = 'https://cognitiveservices.azure.com/.default';
+  private _tokens: TokenInfo[] = [];
+  private _deploymentScope = 'https://management.azure.com/.default';
+  private _openAIScope = 'https://cognitiveservices.azure.com/.default';
   private _serverEnv: Env | undefined;
 
   name = 'AzureOpenAI';
@@ -44,10 +82,6 @@ export default class AzureOpenAIProvider extends BaseProvider {
   ): Promise<ModelInfo[]> {
     this._serverEnv = serverEnv as any;
 
-    /*
-     * We can auth either with an API key, or a managed identity.
-     * API keys is easiest - try that first.
-     */
     const { baseUrl: resourceName, apiKey } = this.getProviderBaseUrlAndKey({
       apiKeys,
       providerSettings: settings,
@@ -58,10 +92,7 @@ export default class AzureOpenAIProvider extends BaseProvider {
     });
 
     if (apiKey && resourceName) {
-      /*
-       * Use the deployments API to get the models. CognitiveServicesManagementClient can only be used
-       * with a managed identity.
-       */
+      // Use API key authentication
       const response = await fetch(
         `https://${resourceName.trim()}.openai.azure.com/openai/deployments?api-version=2022-12-01`,
         {
@@ -71,105 +102,177 @@ export default class AzureOpenAIProvider extends BaseProvider {
         },
       );
 
-      const res = (await response.json()) as any;
+      if (!response.ok) {
+        throw new Error(`Failed to fetch deployments using API key. ${response.statusText}`);
+      }
 
-      const data = res.data.filter(
-        (model: any) =>
-          model.object === 'deployment' && (model.model.startsWith('gpt-') || model.model.startsWith('o')),
-      );
+      const res: { data: OpenAIDeployment[] } = await response.json();
 
-      const modelContextWindows = [
-        {
-          id: 'gpt-35-turbo',
-          context_window: 16385,
-        },
-        {
-          id: 'gpt-4',
-          context_window: 8192,
-        },
-      ];
-
-      return data.map((m: any) => {
-        const matchingModel = modelContextWindows.find(
-          (model) => m.model.includes(model.id) || m.id.includes(model.id),
-        );
-
-        return {
-          name: m.id,
-          label: `${m.model}`,
-          provider: this.name,
-          maxTokenAllowed: matchingModel?.context_window || m.context_window || 32000,
-        };
-      });
+      return this._processDeployments(res.data);
     }
 
-    // Try managed identity
+    // Use a configured app managed identity
     const { clientId, tenantId, subscriptionId, resourceGroup } = this._getAzureConfiguration(this._serverEnv);
 
     if (!subscriptionId || !resourceGroup || !clientId || !tenantId || !resourceName) {
       throw `Missing Api Key, Endpoint configuration, or Managed Identity for ${this.name} provider`;
     }
 
-    const client = new CognitiveServicesManagementClient(this._getAzureCredentials(serverEnv as any), subscriptionId);
-    const models: ModelInfo[] = [];
+    const token = await this._getAccessToken(this._deploymentScope);
+    const deployments = await this._getDeployments(token, subscriptionId, resourceGroup, resourceName);
 
-    for await (const deployment of client.deployments.list(resourceGroup, resourceName)) {
-      if (deployment.name && deployment.properties?.capabilities?.chatCompletion) {
-        models.push({
-          name: deployment.name,
-          label: this._createModelLabel(deployment) || deployment.name,
-          provider: this.name,
-          maxTokenAllowed: deployment.properties?.capabilities?.maxOutputToken
-            ? Number.parseInt(deployment.properties.capabilities.maxOutputToken)
-            : 32000,
-        });
-      }
-    }
-
-    return models;
+    return this._processDeployments(deployments);
   }
 
-  private _createModelLabel = (deployment: Deployment): string | undefined => {
+  private async _getDeployments(
+    token: string,
+    subscriptionId: string,
+    resourceGroup: string,
+    resourceName: string,
+  ): Promise<AzureDeployment[]> {
+    const response = await fetch(
+      `https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${resourceGroup}/providers/Microsoft.CognitiveServices/accounts/${resourceName}/deployments?api-version=2023-05-01`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch deployments: ${response.statusText}`);
+    }
+
+    const data: { value: AzureDeployment[] } = await response.json();
+
+    return data.value || [];
+  }
+
+  private _processDeployments(deployments: DeploymentType[]): ModelInfo[] {
+    const modelContextWindows = [
+      { id: 'gpt-35-turbo', context_window: 16385 },
+      { id: 'gpt-4', context_window: 8192 },
+    ];
+
+    return deployments
+      .filter((deployment) => this._isValidDeployment(deployment))
+      .map((deployment) => {
+        const modelName = this._getModelName(deployment);
+        const matchingModel = modelContextWindows.find((model) => modelName.includes(model.id));
+
+        return {
+          name: this._getDeploymentName(deployment),
+          label: this._createModelLabel(deployment),
+          provider: this.name,
+          maxTokenAllowed: this._getMaxTokens(deployment, matchingModel?.context_window),
+        };
+      });
+  }
+
+  private _isValidDeployment(deployment: DeploymentType): boolean {
+    if (this._isOpenAIDeployment(deployment)) {
+      return (
+        deployment.object === 'deployment' && (deployment.model.startsWith('gpt-') || deployment.model.startsWith('o'))
+      );
+    }
+
+    return !!deployment.properties?.capabilities?.chatCompletion;
+  }
+
+  private _isOpenAIDeployment(deployment: DeploymentType): deployment is OpenAIDeployment {
+    return 'object' in deployment && 'model' in deployment;
+  }
+
+  private _getDeploymentName(deployment: DeploymentType): string {
+    if (this._isOpenAIDeployment(deployment)) {
+      return deployment.id;
+    }
+
+    return deployment.name;
+  }
+
+  private _getModelName(deployment: DeploymentType): string {
+    if (this._isOpenAIDeployment(deployment)) {
+      return deployment.model;
+    }
+
+    return deployment.properties?.model?.name || deployment.name;
+  }
+
+  private _getMaxTokens(deployment: DeploymentType, defaultWindow?: number): number {
+    if (this._isOpenAIDeployment(deployment)) {
+      return defaultWindow || 32000;
+    }
+
+    return deployment.properties?.capabilities?.maxOutputToken
+      ? Number.parseInt(deployment.properties.capabilities.maxOutputToken)
+      : defaultWindow || 32000;
+  }
+
+  private _createModelLabel(deployment: DeploymentType): string {
+    if (this._isOpenAIDeployment(deployment)) {
+      return deployment.model;
+    }
+
     const model = deployment.properties?.model;
 
-    if (model) {
-      const label = `${model.format} ${model.name}`;
-
-      if (!model.version) {
-        return label;
-      }
-
-      return `${label} (${model.version})`;
+    if (!model) {
+      return deployment.name;
     }
 
-    return undefined;
-  };
+    const label = `${model.format || ''} ${model.name || ''}`.trim();
 
-  private _isTokenExpired(): boolean {
-    // 60 seconds left?
-    return !this._accessToken || this._accessToken.expiresOnTimestamp - 60000 < Date.now();
+    return model.version ? `${label} (${model.version})` : label;
   }
 
-  private _getAccessToken = async (): Promise<string> => {
+  private async _getAccessToken(scope: string): Promise<string> {
+    const existingToken = this._tokens.find((t) => t.scope === scope);
+
+    if (existingToken && existingToken.expiresAt - 60000 > Date.now()) {
+      return existingToken.token;
+    }
+
     const { clientId, tenantId, clientSecret } = this._getAzureConfiguration(this._serverEnv);
 
     if (!clientId || !tenantId || !clientSecret) {
-      return '';
+      throw new Error('Missing Azure credentials');
     }
 
-    if (this._isTokenExpired()) {
-      logger.debug('Azure token expired, refreshing...');
-      this._accessToken = await this._getAzureCredentials(this._serverEnv).getToken(this._scope);
+    const response = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+        scope,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get access token');
     }
 
-    return this._accessToken?.token || '';
-  };
+    const data = (await response.json()) as TokenResponse;
 
-  private _getAzureCredentials = (serverEnv?: Env): ClientSecretCredential => {
-    const { clientId, tenantId, clientSecret } = this._getAzureConfiguration(serverEnv);
+    if (data.token_type !== 'Bearer') {
+      throw new Error('Invalid token type returned from Azure.');
+    }
 
-    return new ClientSecretCredential(tenantId, clientId, clientSecret);
-  };
+    const tokenInfo: TokenInfo = {
+      token: data.access_token,
+      expiresAt: Date.now() + data.expires_in * 1000,
+      scope,
+    };
+
+    // Remove old token for this scope if it exists
+    this._tokens = this._tokens.filter((t) => t.scope !== scope);
+    this._tokens.push(tokenInfo);
+
+    return tokenInfo.token;
+  }
 
   private _getAzureConfiguration(serverEnv?: Env) {
     const manager = LLMManager.getInstance();
@@ -193,16 +296,8 @@ export default class AzureOpenAIProvider extends BaseProvider {
   private _fetchWithBearerAuth():
     | ((request: RequestInfo | URL, init?: RequestInit<RequestInitCfProperties>) => Promise<Response>)
     | undefined {
-    if (!this._getAccessToken) {
-      return undefined;
-    }
-
     return async (request: RequestInfo | URL, init?: RequestInit<RequestInitCfProperties>): Promise<Response> => {
-      if (!this._getAccessToken) {
-        throw new Error("getAccessToken is not defined in the provider's instance");
-      }
-
-      const token = await this._getAccessToken();
+      const token = await this._getAccessToken(this._openAIScope);
 
       if (!token) {
         throw new Error('No available access token for API.');
