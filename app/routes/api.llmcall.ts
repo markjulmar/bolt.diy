@@ -111,6 +111,10 @@ async function llmCallAction({ context, request }: ActionFunctionArgs) {
 
       logger.info(`Generating response Provider: ${provider.name}, Model: ${modelDetails.name}`);
 
+      // MCS: add reasoning model support
+      const isReasoningModel =
+        modelDetails.name.toLowerCase().startsWith('o') && providerInfo.name.toLowerCase().includes('openai');
+
       const result = await generateText({
         system,
         messages: [
@@ -125,7 +129,15 @@ async function llmCallAction({ context, request }: ActionFunctionArgs) {
           apiKeys,
           providerSettings,
         }),
-        maxTokens: dynamicMaxTokens,
+        temperature: isReasoningModel ? 1 : 0,
+        ...(isReasoningModel !== true && {
+          maxTokens: dynamicMaxTokens,
+        }),
+        ...(isReasoningModel === true && {
+          providerOptions: {
+            openai: { maxCompletionTokens: dynamicMaxTokens, reasoningEffort: 'low', temperature: 1 },
+          },
+        }),
         toolChoice: 'none',
       });
       logger.info(`Generated response`);

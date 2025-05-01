@@ -157,6 +157,10 @@ ${props.summary}
 
   // console.log(systemPrompt, processedMessages);
 
+  // MCS: add reasoning model support
+  const isReasoningModel =
+    modelDetails.name.toLowerCase().startsWith('o') && provider.name.toLowerCase().includes('openai');
+
   return await _streamText({
     model: provider.getModelInstance({
       model: modelDetails.name,
@@ -164,8 +168,16 @@ ${props.summary}
       apiKeys,
       providerSettings,
     }),
+    temperature: isReasoningModel ? 1 : 0,
+    ...(isReasoningModel !== true && {
+      maxTokens: dynamicMaxTokens,
+    }),
+    ...(isReasoningModel === true && {
+      providerOptions: {
+        openai: { maxCompletionTokens: dynamicMaxTokens, reasoningEffort: 'low', temperature: 1 },
+      },
+    }),
     system: systemPrompt,
-    maxTokens: dynamicMaxTokens,
     messages: convertToCoreMessages(processedMessages as any),
     ...options,
   });
