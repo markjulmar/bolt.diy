@@ -118,6 +118,10 @@ export async function selectContext(props: {
     throw new Error('No user message found');
   }
 
+  // MCS: add reasoning model support
+  const isReasoningModel =
+    modelDetails.name.toLowerCase().startsWith('o') && provider.name.toLowerCase().includes('openai');
+
   // select files from the list of code file from the project that might be useful for the current request from the user
   const resp = await generateText({
     system: `
@@ -174,6 +178,7 @@ export async function selectContext(props: {
       apiKeys,
       providerSettings,
     }),
+    temperature: isReasoningModel ? 1 : 0,
   });
 
   const response = resp.text;

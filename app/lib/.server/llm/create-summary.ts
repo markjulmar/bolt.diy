@@ -99,6 +99,10 @@ ${summary.summary}`;
       ? (message.content.find((item) => item.type === 'text')?.text as string) || ''
       : message.content;
 
+  // MCS: add reasoning model support
+  const isReasoningModel =
+    modelDetails.name.toLowerCase().startsWith('o') && provider.name.toLowerCase().includes('openai');
+
   // select files from the list of code file from the project that might be useful for the current request from the user
   const resp = await generateText({
     system: `
@@ -177,7 +181,7 @@ ${slicedMessages
 </new_chats>
 ---
 
-Please provide a summary of the chat till now including the hitorical summary of the chat.
+Please provide a summary of the chat till now including the historical summary of the chat.
 `,
     model: provider.getModelInstance({
       model: currentModel,
@@ -185,6 +189,7 @@ Please provide a summary of the chat till now including the hitorical summary of
       apiKeys,
       providerSettings,
     }),
+    temperature: isReasoningModel ? 1 : 0,
   });
 
   const response = resp.text;
