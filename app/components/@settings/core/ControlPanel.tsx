@@ -73,7 +73,7 @@ const TAB_DESCRIPTIONS: Record<TabType, string> = {
   features: 'Explore new and upcoming features',
   data: 'Manage your data and storage',
   'cloud-providers': 'Configure cloud AI providers and models',
-  'local-providers': 'Configure local AI providers and models',
+  'local-providers': 'Configure local/Azure AI providers and models',
   'service-status': 'Monitor cloud LLM service status',
   connection: 'Check connection status and settings',
   debug: 'Debug tools and system information',

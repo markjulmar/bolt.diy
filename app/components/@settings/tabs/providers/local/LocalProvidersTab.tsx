@@ -9,20 +9,21 @@ import { classNames } from '~/utils/classNames';
 import { BsRobot } from 'react-icons/bs';
 import type { IconType } from 'react-icons';
 import { BiChip } from 'react-icons/bi';
-import { TbBrandOpenai } from 'react-icons/tb';
+import { TbBrandOpenai, TbBrandAzure } from 'react-icons/tb';
 import { providerBaseUrlEnvKeys } from '~/utils/constants';
 import { useToast } from '~/components/ui/use-toast';
 import { Progress } from '~/components/ui/Progress';
 import OllamaModelInstaller from './OllamaModelInstaller';
 
 // Add type for provider names to ensure type safety
-type ProviderName = 'Ollama' | 'LMStudio' | 'OpenAILike';
+type ProviderName = 'Ollama' | 'LMStudio' | 'OpenAILike' | 'AzureOpenAI';
 
 // Update the PROVIDER_ICONS type to use the ProviderName type
 const PROVIDER_ICONS: Record<ProviderName, IconType> = {
   Ollama: BsRobot,
   LMStudio: BsRobot,
   OpenAILike: TbBrandOpenai,
+  AzureOpenAI: TbBrandAzure,
 };
 
 // Update PROVIDER_DESCRIPTIONS to use the same type
@@ -30,6 +31,7 @@ const PROVIDER_DESCRIPTIONS: Record<ProviderName, string> = {
   Ollama: 'Run open-source models locally on your machine',
   LMStudio: 'Local model inference with LM Studio',
   OpenAILike: 'Connect to OpenAI-compatible API endpoints',
+  AzureOpenAI: 'Connect to Azure OpenAI API endpoints',
 };
 
 // Add a constant for the Ollama API base URL
@@ -113,11 +115,11 @@ export default function LocalProvidersTab() {
 
     // Custom sort function to ensure LMStudio appears before OpenAILike
     const sorted = newFilteredProviders.sort((a, b) => {
-      if (a.name === 'LMStudio') {
+      if (a.name === 'LMStudio' || a.name === 'AzureOpenAI') {
         return -1;
       }
 
-      if (b.name === 'LMStudio') {
+      if (b.name === 'LMStudio' || b.name === 'AzureOpenAI') {
         return 1;
       }
 

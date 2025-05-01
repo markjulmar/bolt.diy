@@ -5,7 +5,7 @@ import { TbActivityHeartbeat } from 'react-icons/tb';
 import { BsCheckCircleFill, BsXCircleFill, BsExclamationCircleFill } from 'react-icons/bs';
 import { SiAmazon, SiGoogle, SiHuggingface, SiPerplexity, SiOpenai } from 'react-icons/si';
 import { BsRobot, BsCloud } from 'react-icons/bs';
-import { TbBrain } from 'react-icons/tb';
+import { TbBrain, TbBrandAzure } from 'react-icons/tb';
 import { BiChip, BiCodeBlock } from 'react-icons/bi';
 import { FaCloud, FaBrain } from 'react-icons/fa';
 import type { IconType } from 'react-icons';
@@ -15,6 +15,7 @@ import { useToast } from '~/components/ui/use-toast';
 // Types
 type ProviderName =
   | 'AmazonBedrock'
+  | 'AzureOpenAI'
   | 'Anthropic'
   | 'Cohere'
   | 'Deepseek'
@@ -81,6 +82,15 @@ const PROVIDER_STATUS_URLS: Record<ProviderName, ProviderConfig> = {
       'anthropic-version': '2024-02-29',
     },
     testModel: 'claude-3-sonnet-20240229',
+  },
+  AzureOpenAI: {
+    statusUrl: 'https://azure.status.microsoft/en-us/status',
+    apiUrl:
+      'https://$AZURE_OPENAI_API_KEY.openai.azure.com/openai/deployments/gpt-4o-mini/chat/completions?api-version=2024-02-15-preview',
+    headers: {
+      Authorization: 'Bearer $AZURE_OPENAI_API_KEY',
+    },
+    testModel: 'gpt-4o-mini',
   },
   Cohere: {
     statusUrl: 'https://status.cohere.com/',
@@ -175,6 +185,7 @@ const PROVIDER_STATUS_URLS: Record<ProviderName, ProviderConfig> = {
 const PROVIDER_ICONS: Record<ProviderName, IconType> = {
   AmazonBedrock: SiAmazon,
   Anthropic: FaBrain,
+  AzureOpenAI: TbBrandAzure,
   Cohere: BiChip,
   Google: SiGoogle,
   Groq: BsCloud,
@@ -216,6 +227,7 @@ const ServiceStatusTab = () => {
         Perplexity: 'PERPLEXITY_API_KEY',
         Together: 'TOGETHER_API_KEY',
         AmazonBedrock: 'AWS_BEDROCK_CONFIG',
+        AzureOpenAI: 'AZURE_OPENAI_API_KEY',
         Groq: 'GROQ_API_KEY',
         OpenRouter: 'OPEN_ROUTER_API_KEY',
         XAI: 'XAI_API_KEY',
