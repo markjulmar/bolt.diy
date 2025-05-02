@@ -37,6 +37,11 @@ export async function loadServerBuild(): Promise<any> {
 // serve assets built by vite.
 export async function serveAsset(req: Request, assetsPath: string): Promise<Response | undefined> {
   const url = new URL(req.url);
+
+  if (url.pathname.includes('/api/')) {
+    return;
+  }
+
   const fullPath = path.join(assetsPath, decodeURIComponent(url.pathname));
   console.log('Serving asset, path:', fullPath);
 
