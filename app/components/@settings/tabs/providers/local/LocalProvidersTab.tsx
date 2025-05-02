@@ -91,6 +91,8 @@ export default function LocalProvidersTab() {
         const envKey = providerBaseUrlEnvKeys[key]?.baseUrlKey;
         const envUrl = envKey ? (import.meta.env[envKey] as string | undefined) : undefined;
 
+        console.log(`Mapping provider: ${key} with ${value}`);
+
         // Set base URL if provided by environment
         if (envUrl && !provider.settings.baseUrl) {
           updateProviderSettings(key, {
@@ -155,7 +157,7 @@ export default function LocalProvidersTab() {
     try {
       setIsLoadingModels(true);
 
-      const response = await fetch('http://127.0.0.1:11434/api/tags');
+      const response = await fetch(`${OLLAMA_API_URL}/api/tags`);
       const data = (await response.json()) as { models: OllamaModel[] };
 
       setOllamaModels(
@@ -669,9 +671,11 @@ export default function LocalProvidersTab() {
                         <div className="flex items-center gap-2">
                           <h3 className="text-md font-semibold text-bolt-elements-textPrimary">{provider.name}</h3>
                           <div className="flex gap-1">
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/10 text-green-500">
-                              Local
-                            </span>
+                            {provider.name !== 'AzureOpenAI' && (
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/10 text-green-500">
+                                Local
+                              </span>
+                            )}
                             {URL_CONFIGURABLE_PROVIDERS.includes(provider.name) && (
                               <span className="px-2 py-0.5 text-xs rounded-full bg-purple-500/10 text-purple-500">
                                 Configurable

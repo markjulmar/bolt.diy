@@ -29,8 +29,8 @@ export interface Shortcuts {
   toggleTerminal: Shortcut;
 }
 
-export const URL_CONFIGURABLE_PROVIDERS = ['Ollama', 'LMStudio', 'OpenAILike'];
-export const LOCAL_PROVIDERS = ['OpenAILike', 'LMStudio', 'Ollama'];
+export const URL_CONFIGURABLE_PROVIDERS = ['Ollama', 'LMStudio', 'OpenAILike', 'AzureOpenAI'];
+export const LOCAL_PROVIDERS = ['OpenAILike', 'LMStudio', 'Ollama', 'AzureOpenAI'];
 
 export type ProviderSetting = Record<string, IProviderConfig>;
 
