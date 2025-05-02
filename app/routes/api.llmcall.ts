@@ -151,11 +151,18 @@ async function llmCallAction({ context, request }: ActionFunctionArgs) {
     } catch (error: unknown) {
       console.log(error);
 
-      if (error instanceof Error && error.message?.includes('API key')) {
-        throw new Response('Invalid or missing API key', {
-          status: 401,
-          statusText: 'Unauthorized',
-        });
+      if (error instanceof Error) {
+        if (error.message?.includes('API key')) {
+          throw new Response('Invalid or missing API key', {
+            status: 401,
+            statusText: 'Unauthorized',
+          });
+        } else {
+          throw new Response(error.message, {
+            status: 500,
+            statusText: 'Internal Server Error',
+          });
+        }
       }
 
       throw new Response(null, {

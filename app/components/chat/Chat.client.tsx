@@ -316,11 +316,16 @@ export const ChatImpl = memo(
         setFakeLoading(true);
 
         if (autoSelectTemplate) {
-          const { template, title } = await selectStarterTemplate({
+          const autoTempResponse = await selectStarterTemplate({
             message: messageContent,
             model,
             provider,
+          }).catch((e) => {
+            console.log(e);
+            toast.error('Failed to select starter template\n Continuing with blank template');
           });
+
+          const { template, title } = autoTempResponse || { template: 'blank', title: '' };
 
           if (template !== 'blank') {
             const temResp = await getTemplates(template, title).catch((e) => {
