@@ -310,6 +310,9 @@ export const ChatImpl = memo(
         return;
       }
 
+      // If no locked items, proceed normally with the original message
+      const finalMessageContent = messageContent;
+
       runAnimation();
 
       if (!chatStarted) {
@@ -317,7 +320,7 @@ export const ChatImpl = memo(
 
         if (autoSelectTemplate) {
           const autoTempResponse = await selectStarterTemplate({
-            message: messageContent,
+            message: finalMessageContent,
             model,
             provider,
           }).catch((e) => {
@@ -347,7 +350,7 @@ export const ChatImpl = memo(
                   content: [
                     {
                       type: 'text',
-                      text: `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${messageContent}`,
+                      text: `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${finalMessageContent}`,
                     },
                     ...imageDataList.map((imageData) => ({
                       type: 'image',
@@ -392,7 +395,7 @@ export const ChatImpl = memo(
             content: [
               {
                 type: 'text',
-                text: `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${messageContent}`,
+                text: `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${finalMessageContent}`,
               },
               ...imageDataList.map((imageData) => ({
                 type: 'image',
@@ -431,7 +434,7 @@ export const ChatImpl = memo(
           content: [
             {
               type: 'text',
-              text: `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${userUpdateArtifact}${messageContent}`,
+              text: `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${userUpdateArtifact}${finalMessageContent}`,
             },
             ...imageDataList.map((imageData) => ({
               type: 'image',
@@ -447,7 +450,7 @@ export const ChatImpl = memo(
           content: [
             {
               type: 'text',
-              text: `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${messageContent}`,
+              text: `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${finalMessageContent}`,
             },
             ...imageDataList.map((imageData) => ({
               type: 'image',
